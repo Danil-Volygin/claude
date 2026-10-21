@@ -4,12 +4,16 @@
 # Что делает:
 #   1. Проверяет git, ffmpeg, находит Python 3.11-3.13 (не тот, что первым в PATH).
 #   2. Клонирует Deep-Live-Cam в папку рядом со скриптом.
-#   3. Создаёт venv, ставит зависимости, torch для CUDA 12.8, onnxruntime-gpu, CUDA/cuDNN pip-пакеты.
+#   3. Создаёт venv, ставит зависимости, onnxruntime-gpu с CUDA/cuDNN pip-пакетами.
 #   4. Качает модели inswapper_128_fp16.onnx и gfpgan-1024.onnx.
 #   5. Проверяет, что onnxruntime реально работает на видеокарте.
 #   6. Кладёт start.bat для запуска.
 #
+# Флаг -WithTorch дополнительно ставит torch (2.8 ГБ). Без него всё работает, torch в Deep-Live-Cam опционален.
+#
 # CUDA Toolkit НЕ нужен. Файл сохранён в UTF-8 с BOM, иначе Windows PowerShell 5.1 ломает кириллицу.
+
+param([switch]$WithTorch)
 
 $ErrorActionPreference = "Stop"
 $ProgressPreference = "SilentlyContinue"   # без этого Invoke-WebRequest в PS 5.1 качает в 10 раз медленнее
@@ -84,11 +88,14 @@ Run $VPy -m pip install --upgrade pip
 Step "Зависимости (это долго, 5-15 минут)"
 Run $VPy -m pip install -r requirements.txt
 
-Step "PyTorch для CUDA 12.8 + onnxruntime-gpu + CUDA/cuDNN"
-Run $VPy -m pip install torch torchvision --index-url https://download.pytorch.org/whl/cu128
-& $VPy -m pip uninstall -y onnxruntime onnxruntime-gpu
-Run $VPy -m pip install onnxruntime-gpu==1.26.0
-Run $VPy -m pip install nvidia-cuda-runtime-cu12 nvidia-cudnn-cu12 nvidia-cublas-cu12 nvidia-cufft-cu12
+Step "onnxruntime-gpu + CUDA/cuDNN pip-пакеты (~1.2 ГБ)"
+& $VPy -m pip uninstall -y onnxruntime
+Run $VPy -m pip install "onnxruntime-gpu[cuda,cudnn]==1.26.0"
+
+if ($WithTorch) {
+    Step "PyTorch для CUDA 12.8 (2.8 ГБ, опционально)"
+    Run $VPy -m pip install torch torchvision --index-url https://download.pytorch.org/whl/cu128
+}
 
 Step "Модели"
 New-Item -ItemType Directory -Force -Path "models" | Out-Null
@@ -106,8 +113,7 @@ foreach ($name in $models.Keys) {
 Step "Проверка: onnxruntime реально работает на видеокарте"
 $check = Join-Path $env:TEMP "dlc_cuda_check.py"
 @'
-import torch, onnxruntime as ort
-print("torch", torch.__version__, "cuda", torch.cuda.is_available())
+import onnxruntime as ort
 try:
     ort.preload_dlls()
 except Exception as e:
