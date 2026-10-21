@@ -21,35 +21,25 @@
 Нужно **минимум 12 ГБ свободных**, лучше 20. Скрипт установки откажется запускаться, если меньше 12.
 Быстро почистить: `Параметры → Система → Память → Временные файлы`, плюс корзина и папка Загрузки.
 
-## 1. Поставь системные штуки (один раз)
+## 1–2. Установка одной командой
 
-1. **Драйвер NVIDIA** свежий, через GeForce Experience или с nvidia.com. CUDA Toolkit ставить не надо,
-   скрипт притащит CUDA runtime и cuDNN pip-пакетами внутрь venv.
-2. **Python 3.12** → https://www.python.org/downloads/windows/
-   При установке галочки **Add python.exe to PATH** и **py launcher**. Старый 3.9 из PyCharm не подойдёт,
-   скрипт сам найдёт правильный через `py -3.12`.
-3. **Git** → https://git-scm.com/download/win
-4. **ffmpeg**. Открой PowerShell и выполни:
-   ```powershell
-   iex (irm ffmpeg.tc.ht)
-   ```
-5. **Visual C++ Redistributable 2022** → https://aka.ms/vs/17/release/vc_redist.x64.exe
-6. **OBS Studio** → https://obsproject.com/download
+Открой **обычный** PowerShell, не от администратора, и вставь целиком содержимое
+[`bootstrap.ps1`](bootstrap.ps1). Winget не нужен. Скрипт сам:
 
-Закрой и открой PowerShell заново, чтобы PATH подхватился.
+1. Скачает и тихо поставит **Python 3.12** в профиль пользователя. Твой старый Python из PyCharm не трогает.
+2. Скачает **ffmpeg** в `C:\AI\ffmpeg` и пропишет его в PATH пользователя.
+3. Скачает и поставит **OBS Studio**. Тут выскочит окно прав администратора, жми **Да**.
+4. Склонирует эту репу в `C:\AI\claude`. Если репа приватная, Git попросит залогиниться в GitHub.
+5. Запустит [`install.ps1`](install.ps1): клонирует Deep-Live-Cam, создаст venv, поставит зависимости,
+   torch под CUDA 12.8, onnxruntime-gpu, CUDA/cuDNN pip-пакетами, скачает модели
+   и проверит, что всё реально работает на видеокарте.
 
-## 2. Запусти установку
+CUDA Toolkit ставить не надо. Нужны только свежий драйвер NVIDIA и Git.
+Займёт 15–25 минут. В конце должна быть строка **OK: swap будет на видеокарте**.
 
-Скачай папку `deep-live-cam` из этой репы (или всю репу zip'ом), открой PowerShell в ней и выполни:
+Всё ляжет в `C:\AI\claude\deep-live-cam\Deep-Live-Cam`. Запуск потом всегда через `start.bat` в этой папке.
 
-```powershell
-powershell -ExecutionPolicy Bypass -File .\install.ps1
-```
-
-Скрипт сам клонирует Deep-Live-Cam, создаст venv, поставит зависимости, torch под CUDA 12.8,
-onnxruntime-gpu, скачает модели и проверит, что CUDA видна. Займёт 10–20 минут.
-
-В конце появится `Deep-Live-Cam\start.bat`. Это кнопка запуска.
+Повторный запуск безопасен: уже установленное пропускается.
 
 ## 3. Настрой подмену
 
@@ -94,7 +84,8 @@ onnxruntime-gpu, скачает модели и проверит, что CUDA в
 |---|---|
 | Проверка в конце `install.ps1` пишет «сессия на CPU» | Старый драйвер NVIDIA. Обнови, перезагрузись, снова `install.ps1`. Если не помогло, план Б: поставь CUDA Toolkit 12.8 с сайта NVIDIA. |
 | `cudnn64_9.dll not found` при запуске | В venv не встал `nvidia-cudnn-cu12`. Активируй venv и выполни `pip install nvidia-cudnn-cu12`. |
-| Скрипт не нашёл Python 3.11–3.13 | Поставь Python 3.12 с python.org с галочкой py launcher. |
+| Скрипт не нашёл Python 3.11–3.13 | Поставь Python 3.12 с python.org руками и запусти `bootstrap.ps1` снова. |
+| Кракозябры или ошибки парсинга в `install.ps1` | Файл должен быть в UTF-8 с BOM. Скачивай через `git clone`, а не копипастой в Блокнот. |
 | Чёрное окно превью | Вебку занял другой процесс. Закрой Discord/Zoom, запусти Deep-Live-Cam, потом открывай созвон. |
 | 3–5 fps | Запустилось на CPU. Смотри первую строку таблицы. |
 | Лицо плывёт по краям | Выключи Face Enhancer, добавь света, поменяй фото источника. |
