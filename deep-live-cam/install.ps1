@@ -112,6 +112,9 @@ assert p[0] == 'CUDAExecutionProvider', 'CUDA provider не поднялся, с
 print('OK: swap будет на видеокарте')
 "@
 
+Write-Host "`n== Чистка pip-кэша (вернёт 2-3 ГБ на диске) ==" -ForegroundColor Cyan
+pip cache purge
+
 Write-Host "`n== Лаунчер ==" -ForegroundColor Cyan
 Copy-Item (Join-Path $Root "start.bat") (Join-Path $App "start.bat") -Force
 
