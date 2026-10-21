@@ -4,16 +4,17 @@
 # Что делает:
 #   1. Проверяет git, ffmpeg, находит Python 3.11-3.13 (не тот, что первым в PATH).
 #   2. Клонирует Deep-Live-Cam в папку рядом со скриптом.
-#   3. Создаёт venv, ставит зависимости, onnxruntime-gpu с CUDA/cuDNN pip-пакетами.
+#   3. Создаёт venv, ставит зависимости, onnxruntime-gpu с CUDA/cuDNN, torch для CUDA 12.8.
 #   4. Качает модели inswapper_128_fp16.onnx и gfpgan-1024.onnx.
 #   5. Проверяет, что onnxruntime реально работает на видеокарте.
 #   6. Кладёт start.bat для запуска.
 #
-# Флаг -WithTorch дополнительно ставит torch (2.8 ГБ). Без него всё работает, torch в Deep-Live-Cam опционален.
+# Флаг -SkipTorch пропускает torch (2.8 ГБ): подмена работает и без него, но медленнее
+# (без torch Deep-Live-Cam выключает CUDA graph и вклейку лица на видеокарте).
 #
 # CUDA Toolkit НЕ нужен. Файл сохранён в UTF-8 с BOM, иначе Windows PowerShell 5.1 ломает кириллицу.
 
-param([switch]$WithTorch)
+param([switch]$SkipTorch)
 
 $ErrorActionPreference = "Stop"
 $ProgressPreference = "SilentlyContinue"   # без этого Invoke-WebRequest в PS 5.1 качает в 10 раз медленнее
@@ -92,8 +93,8 @@ Step "onnxruntime-gpu + CUDA/cuDNN pip-пакеты (~1.2 ГБ)"
 & $VPy -m pip uninstall -y onnxruntime
 Run $VPy -m pip install "onnxruntime-gpu[cuda,cudnn]==1.26.0"
 
-if ($WithTorch) {
-    Step "PyTorch для CUDA 12.8 (2.8 ГБ, опционально)"
+if (-not $SkipTorch) {
+    Step "PyTorch для CUDA 12.8 (2.8 ГБ, даёт CUDA graph и вклейку на видеокарте)"
     Run $VPy -m pip install torch torchvision --index-url https://download.pytorch.org/whl/cu128
 }
 
