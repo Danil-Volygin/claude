@@ -14,8 +14,7 @@
 
 | Что | Размер |
 |---|---|
-| CUDA Toolkit 12.8 | ~3 ГБ |
-| venv с torch cu128 и зависимостями | ~6–7 ГБ |
+| venv с torch cu128, CUDA/cuDNN pip-пакетами и зависимостями | ~7–8 ГБ |
 | Модели | ~0.5 ГБ |
 | OBS Studio | ~0.3 ГБ |
 
@@ -24,18 +23,18 @@
 
 ## 1. Поставь системные штуки (один раз)
 
-1. **Драйвер NVIDIA** свежий, через GeForce Experience или с nvidia.com.
-2. **CUDA Toolkit 12.8** → https://developer.nvidia.com/cuda-12-8-0-download-archive
-   Ставь по умолчанию, перезагрузись.
-3. **Python 3.11–3.13** → https://www.python.org/downloads/windows/
-   При установке обязательно галочка **Add python.exe to PATH**.
-4. **Git** → https://git-scm.com/download/win
-5. **ffmpeg**. Открой PowerShell и выполни:
+1. **Драйвер NVIDIA** свежий, через GeForce Experience или с nvidia.com. CUDA Toolkit ставить не надо,
+   скрипт притащит CUDA runtime и cuDNN pip-пакетами внутрь venv.
+2. **Python 3.12** → https://www.python.org/downloads/windows/
+   При установке галочки **Add python.exe to PATH** и **py launcher**. Старый 3.9 из PyCharm не подойдёт,
+   скрипт сам найдёт правильный через `py -3.12`.
+3. **Git** → https://git-scm.com/download/win
+4. **ffmpeg**. Открой PowerShell и выполни:
    ```powershell
    iex (irm ffmpeg.tc.ht)
    ```
-6. **Visual C++ Redistributable 2022** → https://aka.ms/vs/17/release/vc_redist.x64.exe
-7. **OBS Studio** → https://obsproject.com/download
+5. **Visual C++ Redistributable 2022** → https://aka.ms/vs/17/release/vc_redist.x64.exe
+6. **OBS Studio** → https://obsproject.com/download
 
 Закрой и открой PowerShell заново, чтобы PATH подхватился.
 
@@ -93,8 +92,9 @@ onnxruntime-gpu, скачает модели и проверит, что CUDA в
 
 | Симптом | Что делать |
 |---|---|
-| `CUDAExecutionProvider` не в списке | Не стоит CUDA 12.8 или старый драйвер. Переустанови, перезагрузись, снова `install.ps1`. |
-| `cudnn64_9.dll not found` | Поставь cuDNN 9 для CUDA 12 с сайта NVIDIA и добавь его `bin` в PATH. |
+| Проверка в конце `install.ps1` пишет «сессия на CPU» | Старый драйвер NVIDIA. Обнови, перезагрузись, снова `install.ps1`. Если не помогло, план Б: поставь CUDA Toolkit 12.8 с сайта NVIDIA. |
+| `cudnn64_9.dll not found` при запуске | В venv не встал `nvidia-cudnn-cu12`. Активируй venv и выполни `pip install nvidia-cudnn-cu12`. |
+| Скрипт не нашёл Python 3.11–3.13 | Поставь Python 3.12 с python.org с галочкой py launcher. |
 | Чёрное окно превью | Вебку занял другой процесс. Закрой Discord/Zoom, запусти Deep-Live-Cam, потом открывай созвон. |
 | 3–5 fps | Запустилось на CPU. Смотри первую строку таблицы. |
 | Лицо плывёт по краям | Выключи Face Enhancer, добавь света, поменяй фото источника. |

@@ -9,7 +9,8 @@
 #   4. Качает модели inswapper_128_fp16.onnx и gfpgan-1024.onnx.
 #   5. Кладёт start.bat для запуска.
 #
-# Нужно заранее: ~12 ГБ свободного места, CUDA Toolkit 12.8 (см. README.md).
+# Нужно заранее: ~12 ГБ свободного места, Python 3.11-3.13 с python.org, git, ffmpeg.
+# CUDA Toolkit НЕ нужен: CUDA/cuDNN DLL приезжают pip-пакетами внутрь venv.
 
 $ErrorActionPreference = "Stop"
 $Root = Split-Path -Parent $MyInvocation.MyCommand.Path
@@ -24,15 +25,31 @@ function Need($cmd, $hint) {
 
 Write-Host "== Проверка окружения ==" -ForegroundColor Cyan
 Need git    "Поставь Git: https://git-scm.com/download/win"
-Need python "Поставь Python 3.11-3.13 с python.org и отметь 'Add to PATH'."
 Need ffmpeg "Поставь ffmpeg: в PowerShell выполни  iex (irm ffmpeg.tc.ht)  и перезапусти терминал."
 
-$pyver = (python --version 2>&1).ToString()
-Write-Host "Python: $pyver"
-if ($pyver -notmatch "3\.1[1-4]") {
-    Write-Host "[!] Нужен Python 3.11-3.14. Сейчас: $pyver" -ForegroundColor Red
+# Ищем нормальный Python 3.11-3.13 через py-launcher, а не тот, что первым попался в PATH
+# (у тебя в PATH торчит python 3.9 из venv PyCharm, он не подходит).
+$Py = $null
+foreach ($v in "3.12","3.11","3.13") {
+    if (Get-Command py -ErrorAction SilentlyContinue) {
+        $probe = & py "-$v" -c "import sys;print(sys.executable)" 2>$null
+        if ($LASTEXITCODE -eq 0 -and $probe) { $Py = $probe.Trim(); break }
+    }
+}
+if (-not $Py) {
+    foreach ($c in "$env:LOCALAPPDATA\Programs\Python\Python312\python.exe",
+                   "$env:LOCALAPPDATA\Programs\Python\Python311\python.exe",
+                   "$env:LOCALAPPDATA\Programs\Python\Python313\python.exe",
+                   "C:\Python312\python.exe","C:\Python311\python.exe") {
+        if (Test-Path $c) { $Py = $c; break }
+    }
+}
+if (-not $Py) {
+    Write-Host "[!] Не нашёл Python 3.11-3.13. Поставь 3.12 с https://www.python.org/downloads/windows/" -ForegroundColor Red
+    Write-Host "    При установке отметь 'Add python.exe to PATH' и 'py launcher'." -ForegroundColor Red
     exit 1
 }
+Write-Host "Python: $Py ($(& $Py --version))"
 
 $free = [math]::Round((Get-PSDrive -Name ($Root.Substring(0,1))).Free / 1GB, 1)
 Write-Host "Свободно на диске $($Root.Substring(0,1)): $free ГБ"
@@ -42,7 +59,7 @@ if ($free -lt 12) {
 }
 
 if (-not (Get-Command nvidia-smi -ErrorAction SilentlyContinue)) {
-    Write-Host "[!] nvidia-smi не найден. Обнови драйвер NVIDIA и поставь CUDA Toolkit 12.8." -ForegroundColor Yellow
+    Write-Host "[!] nvidia-smi не найден. Обнови драйвер NVIDIA." -ForegroundColor Yellow
 } else {
     nvidia-smi --query-gpu=name,memory.total,driver_version --format=csv,noheader
 }
@@ -56,7 +73,7 @@ if (-not (Test-Path $App)) {
 Set-Location $App
 
 Write-Host "`n== Виртуальное окружение ==" -ForegroundColor Cyan
-if (-not (Test-Path "venv")) { python -m venv venv }
+if (-not (Test-Path "venv")) { & $Py -m venv venv }
 & ".\venv\Scripts\Activate.ps1"
 python -m pip install --upgrade pip
 
@@ -67,6 +84,8 @@ Write-Host "`n== PyTorch для CUDA 12.8 + onnxruntime-gpu ==" -ForegroundColor
 pip install -U torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu128
 pip uninstall -y onnxruntime onnxruntime-gpu
 pip install onnxruntime-gpu==1.26.0
+# CUDA runtime и cuDNN 9 как pip-пакеты, чтобы не ставить CUDA Toolkit целиком
+pip install nvidia-cuda-runtime-cu12 nvidia-cudnn-cu12 nvidia-cublas-cu12 nvidia-cufft-cu12
 
 Write-Host "`n== Модели ==" -ForegroundColor Cyan
 New-Item -ItemType Directory -Force -Path "models" | Out-Null
@@ -81,8 +100,17 @@ foreach ($name in $models.Keys) {
     Invoke-WebRequest -Uri $models[$name] -OutFile $dst
 }
 
-Write-Host "`n== Проверка CUDA в onnxruntime ==" -ForegroundColor Cyan
-python -c "import onnxruntime as ort; p=ort.get_available_providers(); print(p); assert 'CUDAExecutionProvider' in p, 'CUDA provider не найден'"
+Write-Host "`n== Проверка: onnxruntime реально поднимает CUDA ==" -ForegroundColor Cyan
+python -c @"
+import torch, onnxruntime as ort
+print('torch', torch.__version__, 'cuda', torch.cuda.is_available())
+ort.preload_dlls()
+s = ort.InferenceSession('models/inswapper_128_fp16.onnx', providers=['CUDAExecutionProvider','CPUExecutionProvider'])
+p = s.get_providers()
+print('onnxruntime', ort.__version__, p)
+assert p[0] == 'CUDAExecutionProvider', 'CUDA provider не поднялся, сессия на CPU'
+print('OK: swap будет на видеокарте')
+"@
 
 Write-Host "`n== Лаунчер ==" -ForegroundColor Cyan
 Copy-Item (Join-Path $Root "start.bat") (Join-Path $App "start.bat") -Force
