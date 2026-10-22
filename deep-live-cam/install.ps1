@@ -115,6 +115,7 @@ Step "Проверка: onnxruntime реально работает на вид�
 $check = Join-Path $env:TEMP "dlc_cuda_check.py"
 @'
 import onnxruntime as ort
+ort.set_default_logger_severity(3)
 try:
     ort.preload_dlls()
 except Exception as e:
@@ -123,8 +124,8 @@ s = ort.InferenceSession("models/inswapper_128_fp16.onnx", providers=["CUDAExecu
 p = s.get_providers()
 print("onnxruntime", ort.__version__, p)
 if p[0] != "CUDAExecutionProvider":
-    raise SystemExit("FAIL: CUDA не поднялась, всё будет на процессоре")
-print("OK: swap будет на видеокарте")
+    raise SystemExit("FAIL: CUDA provider did not start, everything would run on CPU")
+print("OK: face swap runs on the GPU")
 '@ | Set-Content -Path $check -Encoding ASCII
 Run $VPy $check
 
