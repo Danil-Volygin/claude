@@ -111,6 +111,9 @@ foreach ($name in $models.Keys) {
     Invoke-WebRequest -Uri $models[$name] -OutFile $dst -UseBasicParsing
 }
 
+Step "Модели поиска лица buffalo_l (~340 МБ, иначе программа качает их при первом Live и висит)"
+Run $VPy -c "from modules.model_downloader import ensure_insightface_pack as e; import sys; sys.exit(0 if e('buffalo_l') else 1)"
+
 Step "Проверка: onnxruntime реально работает на видеокарте"
 $check = Join-Path $env:TEMP "dlc_cuda_check.py"
 @'
