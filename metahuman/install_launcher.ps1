@@ -8,10 +8,16 @@ $free = [math]::Round((Get-PSDrive C).Free / 1GB, 1)
 Write-Host "Свободно на C: $free ГБ" -ForegroundColor Cyan
 if ($free -lt 80) { Write-Host "[!] Нужно минимум 80 ГБ под движок и проект. Освободи место." -ForegroundColor Red; return }
 
-$exe = @("${env:ProgramFiles(x86)}\Epic Games\Launcher\Portal\Binaries\Win64\EpicGamesLauncher.exe",
-         "${env:ProgramFiles(x86)}\Epic Games\Launcher\Portal\Binaries\Win32\EpicGamesLauncher.exe",
-         "$env:ProgramFiles\Epic Games\Launcher\Portal\Binaries\Win64\EpicGamesLauncher.exe") |
-       Where-Object { Test-Path $_ } | Select-Object -First 1
+function Find-Launcher {
+    foreach ($root in "${env:ProgramFiles(x86)}\Epic Games", "$env:ProgramFiles\Epic Games") {
+        if (Test-Path $root) {
+            $f = Get-ChildItem $root -Recurse -Filter EpicGamesLauncher.exe -ErrorAction SilentlyContinue | Select-Object -First 1
+            if ($f) { return $f.FullName }
+        }
+    }
+    return $null
+}
+$exe = Find-Launcher
 
 if (-not $exe) {
     Write-Host "== Качаю Epic Games Launcher ==" -ForegroundColor Cyan
@@ -26,12 +32,16 @@ if (-not $exe) {
     Write-Host "== Ставлю (спросит права администратора, жми Да) ==" -ForegroundColor Cyan
     $p = Start-Process msiexec.exe -ArgumentList "/i `"$msi`" /passive /norestart" -Verb RunAs -Wait -PassThru
     if ($p.ExitCode -ne 0 -and $p.ExitCode -ne 3010) { Write-Host "[!] Установщик вернул код $($p.ExitCode)" -ForegroundColor Red; return }
-    $exe = @("${env:ProgramFiles(x86)}\Epic Games\Launcher\Portal\Binaries\Win64\EpicGamesLauncher.exe",
-             "${env:ProgramFiles(x86)}\Epic Games\Launcher\Portal\Binaries\Win32\EpicGamesLauncher.exe") |
-           Where-Object { Test-Path $_ } | Select-Object -First 1
+    $exe = Find-Launcher
 }
-if (-not $exe) { Write-Host "[!] Лаунчер не нашёлся после установки" -ForegroundColor Red; return }
-Write-Host "Лаунчер: $exe" -ForegroundColor Green
+if ($exe) {
+    Write-Host "Лаунчер: $exe" -ForegroundColor Green
+} elseif (Test-Path "Registry::HKEY_CLASSES_ROOT\com.epicgames.launcher") {
+    Write-Host "Файл лаунчера не нашёл, но ссылки Epic зарегистрированы, открываю через них." -ForegroundColor Yellow
+} else {
+    Write-Host "[!] Лаунчер не установился. Скачай руками: https://store.epicgames.com/download" -ForegroundColor Red
+    return
+}
 
 Write-Host "== Открываю лаунчер на вкладке Unreal Engine ==" -ForegroundColor Cyan
 Start-Process "com.epicgames.launcher://ue/library"
