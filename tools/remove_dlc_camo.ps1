@@ -1,6 +1,9 @@
-﻿# Удаляет Deep-Live-Cam (с моделями) и Camo. Сначала показывает список и спрашивает подтверждение.
+﻿# Удаляет Camo. Deep-Live-Cam удаляется, только если запустить с флагом -WithDeepLiveCam.
+# Сначала показывает список и спрашивает подтверждение.
 # Не трогает: OBS (нужен для Discord), Unreal Engine, Python, ffmpeg, папку C:\AI\claude с гайдами.
 # Запуск: powershell -NoProfile -ExecutionPolicy Bypass -File C:\AI\claude\tools\remove_dlc_camo.ps1
+
+param([switch]$WithDeepLiveCam)
 
 $ErrorActionPreference = "SilentlyContinue"
 
@@ -20,7 +23,7 @@ $paths = @(
     "$env:USERPROFILE\Desktop\sysreport.txt",
     "$env:TEMP\dlc-setup",
     "$env:TEMP\dlc_cuda_check.py"
-) | Where-Object { Test-Path -LiteralPath $_ }
+) | Where-Object { $WithDeepLiveCam -and (Test-Path -LiteralPath $_) }
 
 $uninstallKeys = "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\*",
                  "HKLM:\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\*",
@@ -39,8 +42,10 @@ $a = Read-Host "`nУдалить? Введи y и нажми Enter"
 if ($a -ne "y") { Write-Host "Отменено, ничего не удалено."; return }
 
 Write-Host "`n== Закрываю процессы ==" -ForegroundColor Cyan
-Get-CimInstance Win32_Process | Where-Object { $_.ExecutablePath -like "C:\AI\claude\deep-live-cam\*" } |
-    ForEach-Object { Stop-Process -Id $_.ProcessId -Force }
+if ($WithDeepLiveCam) {
+    Get-CimInstance Win32_Process | Where-Object { $_.ExecutablePath -like "C:\AI\claude\deep-live-cam\*" } |
+        ForEach-Object { Stop-Process -Id $_.ProcessId -Force }
+}
 Get-Process | Where-Object { $_.ProcessName -match '^Camo' } | Stop-Process -Force
 Start-Sleep 2
 
